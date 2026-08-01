@@ -31,20 +31,47 @@ dependencies:
   flutter:
     sdk: flutter
 
-  # The following adds the Cupertino Icons font to your application.
-  # Use with the CupertinoIcons class for iOS style icons.
+  # Backend
+  supabase_flutter: ^2.8.0
+
+  # State management
+  flutter_riverpod: ^2.6.1
+  riverpod_annotation: ^2.6.1
+
+  # Local offline database
+  drift: ^2.22.1
+  sqlite3_flutter_libs: ^0.5.28
+  path_provider: ^2.1.5
+  path: ^1.9.0
+
+  # Connectivity (for reconnect → sync)
+  connectivity_plus: ^6.1.0
+
+  # Env config (keep the Supabase URL/anon key out of source control)
+  flutter_dotenv: ^5.2.1
+
+  # Rich content / models
+  freezed_annotation: ^2.4.4
+  json_annotation: ^4.9.0
+
+  # PDF viewing
+  syncfusion_flutter_pdfviewer: ^27.2.5 # or flutter_pdfview if you prefer a lighter/free alt
+
+  # Icons (matches the mockup's line-icon style)
   cupertino_icons: ^1.0.8
+
+  url_launcher: ^6.3.1
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-
-  # The "flutter_lints" package below contains a set of recommended lints to
-  # encourage good coding practices. The lint set provided by the package is
-  # activated in the `analysis_options.yaml` file located at the root of your
-  # package. See that file for information about deactivating specific lint
-  # rules and activating additional ones.
   flutter_lints: ^6.0.0
+
+  build_runner: ^2.4.13
+  drift_dev: ^2.22.1
+  riverpod_generator: ^2.6.3
+  freezed: ^2.5.7
+  json_serializable: ^6.9.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -55,6 +82,9 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  assets:
+    - .env
 
   fonts:
     - family: Poppins
