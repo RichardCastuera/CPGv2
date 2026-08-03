@@ -6,6 +6,7 @@ import 'package:path/path.dart' as p;
 import 'package:drift/drift.dart';
 import '../database/app_database.dart';
 import '../supabase/supabase_client.dart';
+import '../../models/artifact.dart';
 import '../../repositories/guideline_repository.dart';
 
 class DownloadProgress {
@@ -184,6 +185,73 @@ class DownloadManager {
 
   void cancelDownload(String guidelineId) {
     _activeTokens[guidelineId]?.cancel();
+  }
+
+  Future<String> downloadArtifact(
+    String guidelineId,
+    Artifact artifact, {
+    required void Function(DownloadProgress) onProgress,
+  }) async {
+    final token = _CancelToken();
+    _activeTokens[artifact.id] = token;
+
+    try {
+      final docsDir = await getApplicationDocumentsDirectory();
+      final guidelineDir = Directory(
+        p.join(docsDir.path, 'downloads', guidelineId),
+      );
+      await guidelineDir.create(recursive: true);
+
+      final signedUrlRes = await _supabase.storage
+          .from('artifacts')
+          .createSignedUrl(artifact.storagePath, 60);
+
+      final destFile = File(
+        p.join(
+          guidelineDir.path,
+          '${artifact.id}_${p.basename(artifact.storagePath)}',
+        ),
+      );
+
+      int cumulativeDownloaded = 0;
+      await _streamDownload(
+        url: signedUrlRes,
+        destFile: destFile,
+        token: token,
+        fileName: artifact.name,
+        onTotalKnown: (total) {
+          onProgress(
+            DownloadProgress(
+              bytesDownloaded: 0,
+              totalBytes: total,
+              currentFileName: artifact.name,
+            ),
+          );
+        },
+        onChunk: (chunkLen) {
+          cumulativeDownloaded += chunkLen;
+          onProgress(
+            DownloadProgress(
+              bytesDownloaded: cumulativeDownloaded,
+              totalBytes: artifact.sizeBytes,
+              currentFileName: artifact.name,
+            ),
+          );
+        },
+      );
+
+      await (_db.update(_db.artifacts)..where((a) => a.id.equals(artifact.id)))
+          .write(ArtifactsCompanion(localFilePath: Value(destFile.path)));
+
+      return destFile.path;
+    } on DownloadCancelledException {
+      if (_activeTokens.containsKey(artifact.id)) {
+        await _deleteGuidelineFiles(guidelineId);
+      }
+      rethrow;
+    } finally {
+      _activeTokens.remove(artifact.id);
+    }
   }
 
   /// Removes a downloaded guideline's local files and clears the

@@ -15,6 +15,7 @@ class Artifact with _$Artifact {
     @JsonKey(name: 'storage_path') required String storagePath,
     @JsonKey(name: 'mime_type') required String mimeType,
     @JsonKey(name: 'size_bytes') required int sizeBytes,
+    @JsonKey(name: 'local_file_path') String? localFilePath,
   }) = _Artifact;
 
   factory Artifact.fromJson(Map<String, dynamic> json) =>

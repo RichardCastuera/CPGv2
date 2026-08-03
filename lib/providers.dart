@@ -1,4 +1,5 @@
 import 'package:cpg_reader/core/database/app_database.dart';
+import 'package:cpg_reader/core/downloads/download_manager.dart';
 import 'package:cpg_reader/models/artifact.dart';
 import 'package:cpg_reader/models/guideline.dart';
 import 'package:cpg_reader/models/guideline_library_item.dart';
@@ -69,3 +70,10 @@ final referencesStreamProvider = StreamProvider.family<List<Reference>, String>(
   (ref, guidelineId) =>
       ref.watch(guidelineRepositoryProvider).watchReferences(guidelineId),
 );
+
+final downloadManagerProvider = Provider<DownloadManager>((ref) {
+  return DownloadManager(
+    ref.read(appDatabaseProvider),
+    ref.read(guidelineRepositoryProvider),
+  );
+});

@@ -1,3 +1,6 @@
+import 'package:cpg_reader/core/downloads/download_manager.dart';
+import 'package:cpg_reader/features/guideline_detail/pdf_preview_page.dart';
+import 'package:cpg_reader/models/artifact.dart';
 import 'package:cpg_reader/models/question.dart';
 import 'package:cpg_reader/models/section.dart';
 import 'package:cpg_reader/providers.dart';
@@ -16,6 +19,10 @@ class GuidelineDetailPage extends ConsumerStatefulWidget {
 
 class _GuidelineDetailPageState extends ConsumerState<GuidelineDetailPage> {
   bool _isSyncing = false;
+  bool _isDownloading = false;
+  DownloadProgress? _downloadProgress;
+
+  DownloadManager get _downloadManager => ref.read(downloadManagerProvider);
 
   Future<void> _syncDetails() async {
     setState(() => _isSyncing = true);
@@ -39,6 +46,81 @@ class _GuidelineDetailPageState extends ConsumerState<GuidelineDetailPage> {
     }
   }
 
+  Future<void> _downloadResources() async {
+    setState(() {
+      _isDownloading = true;
+      _downloadProgress = const DownloadProgress(
+        bytesDownloaded: 0,
+        totalBytes: -1,
+        currentFileName: 'Preparing',
+      );
+    });
+
+    try {
+      await _downloadManager.downloadGuideline(
+        widget.guidelineId,
+        onProgress: (progress) {
+          if (!mounted) return;
+          setState(() {
+            _downloadProgress = progress;
+          });
+        },
+      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Download complete.')));
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Download failed: $error')));
+    } finally {
+      if (mounted) {
+        setState(() => _isDownloading = false);
+      }
+    }
+  }
+
+  Future<void> _downloadArtifact(Artifact artifact) async {
+    setState(() {
+      _isDownloading = true;
+      _downloadProgress = DownloadProgress(
+        bytesDownloaded: 0,
+        totalBytes: artifact.sizeBytes,
+        currentFileName: artifact.name,
+      );
+    });
+
+    try {
+      await _downloadManager.downloadArtifact(
+        widget.guidelineId,
+        artifact,
+        onProgress: (progress) {
+          if (!mounted) return;
+          setState(() {
+            _downloadProgress = progress;
+          });
+        },
+      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('${artifact.name} downloaded.')));
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Download failed: $error')));
+    } finally {
+      if (mounted) {
+        setState(() => _isDownloading = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final guidelineAsync = ref.watch(guidelineProvider(widget.guidelineId));
@@ -51,9 +133,16 @@ class _GuidelineDetailPageState extends ConsumerState<GuidelineDetailPage> {
           IconButton(
             icon: _isSyncing
                 ? const CircularProgressIndicator(color: Colors.white)
-                : const Icon(Icons.download),
+                : const Icon(Icons.sync),
             onPressed: _isSyncing ? null : _syncDetails,
             tooltip: 'Sync details',
+          ),
+          IconButton(
+            icon: _isDownloading
+                ? const CircularProgressIndicator(color: Colors.white)
+                : const Icon(Icons.download_for_offline),
+            onPressed: _isDownloading ? null : _downloadResources,
+            tooltip: 'Download artifacts and PDF',
           ),
         ],
       ),
@@ -95,6 +184,18 @@ class _GuidelineDetailPageState extends ConsumerState<GuidelineDetailPage> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        if (_downloadProgress != null)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              LinearProgressIndicator(value: _downloadProgress!.fraction),
+              const SizedBox(height: 8),
+              Text(
+                '${_downloadProgress!.currentFileName} · ${_downloadProgress!.bytesDownloaded} / ${_downloadProgress!.totalBytes > 0 ? _downloadProgress!.totalBytes : '...'} bytes',
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
         Text('Sections', style: Theme.of(context).textTheme.headlineSmall),
         const SizedBox(height: 12),
         sectionsAsync.when(
@@ -136,8 +237,44 @@ class _GuidelineDetailPageState extends ConsumerState<GuidelineDetailPage> {
                     (artifact) => ListTile(
                       leading: const Icon(Icons.insert_drive_file),
                       title: Text(artifact.name),
-                      subtitle: Text(artifact.category.name),
-                      trailing: Text('${artifact.sizeBytes} bytes'),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(artifact.category.name),
+                          Text(artifact.mimeType),
+                        ],
+                      ),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (artifact.localFilePath != null &&
+                              artifact.mimeType == 'application/pdf')
+                            IconButton(
+                              icon: const Icon(Icons.picture_as_pdf),
+                              tooltip: 'Preview PDF',
+                              onPressed: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => PdfPreviewPage(
+                                      filePath: artifact.localFilePath!,
+                                      title: artifact.name,
+                                    ),
+                                  ),
+                                );
+                              },
+                            )
+                          else if (artifact.localFilePath != null)
+                            const Icon(Icons.check, color: Colors.green),
+                          if (artifact.localFilePath == null)
+                            IconButton(
+                              icon: const Icon(Icons.download),
+                              tooltip: 'Download this artifact',
+                              onPressed: _isDownloading
+                                  ? null
+                                  : () => _downloadArtifact(artifact),
+                            ),
+                        ],
+                      ),
                     ),
                   )
                   .toList(),
