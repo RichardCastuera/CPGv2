@@ -6,25 +6,22 @@ import 'package:path_provider/path_provider.dart';
 
 part 'app_database.g.dart';
 
-// ------------------------------------------------------------
-// Mirrors of the Supabase tables actually needed offline.
-// Notably excluded: profiles, audit_log, comments, guideline_versions'
-// draft/in_review/superseded rows (RLS already filters those out
-// server-side — no reason to cache what the app can never see).
-// ------------------------------------------------------------
-
 @DataClassName('GuidelineRow')
 class Guidelines extends Table {
   TextColumn get id => text()();
   TextColumn get title => text()();
   TextColumn get shortTitle => text().nullable()();
-  TextColumn get guidelineType => text()(); // 'Compendium' | 'Interim'
+  TextColumn get guidelineType => text()();
   TextColumn get specialtyTags => text()(); // JSON-encoded List<String>
   TextColumn get societies => text()(); // JSON-encoded List<String>
   TextColumn get doi => text().nullable()();
-  TextColumn get status => text()(); // 'published' | 'archived'
+  TextColumn get status => text()();
   TextColumn get currentVersionId => text().nullable()();
   DateTimeColumn get nextReviewDate => dateTime().nullable()();
+
+  // NEW (schema v2) — embedded authors, JSON-encoded List<GuidelineAuthor>.
+  // Replaces reliance on the separate GuidelineAuthors table below.
+  TextColumn get authors => text().withDefault(const Constant('[]'))();
 
   // ---- client-only columns, no Supabase equivalent ----
   BoolColumn get isDownloaded => boolean().withDefault(const Constant(false))();
@@ -36,6 +33,11 @@ class Guidelines extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+// Kept for now (harmless if unused) in case any old cached rows still
+// reference it, and in case the CMS team reverts. Repository code no
+// longer reads or writes to this table as of the authors-embedding
+// change — safe to drop entirely in a future migration once confirmed
+// unnecessary.
 @DataClassName('GuidelineAuthorRow')
 class GuidelineAuthors extends Table {
   TextColumn get id => text()();
@@ -59,8 +61,6 @@ class GuidelineVersions extends Table {
   DateTimeColumn get effectiveDate => dateTime().nullable()();
   TextColumn get sourcePdfUrl => text().nullable()();
   DateTimeColumn get publishedAt => dateTime().nullable()();
-
-  // Local path once the full PDF has been downloaded to device storage.
   TextColumn get localPdfPath => text().nullable()();
 
   @override
@@ -72,7 +72,7 @@ class Sections extends Table {
   TextColumn get id => text()();
   TextColumn get versionId => text().references(GuidelineVersions, #id)();
   TextColumn get title => text()();
-  TextColumn get overview => text().nullable()(); // JSON-encoded Tiptap doc
+  TextColumn get overview => text().nullable()();
   TextColumn get status => text()();
   IntColumn get sortOrder => integer().withDefault(const Constant(0))();
 
@@ -86,7 +86,7 @@ class Questions extends Table {
   TextColumn get sectionId => text().references(Sections, #id)();
   TextColumn get title => text()();
   TextColumn get clinicalQuestion => text().nullable()();
-  TextColumn get background => text().nullable()(); // JSON-encoded Tiptap doc
+  TextColumn get background => text().nullable()();
   TextColumn get status => text()();
   IntColumn get sortOrder => integer().withDefault(const Constant(0))();
 
@@ -102,10 +102,9 @@ class Recommendations extends Table {
   TextColumn get number => text().nullable()();
   TextColumn get strength => text().nullable()();
   TextColumn get certaintyOfEvidence => text().nullable()();
-  TextColumn get statement => text().nullable()(); // JSON-encoded Tiptap doc
-  TextColumn get comment => text().nullable()(); // JSON-encoded Tiptap doc
-  TextColumn get evidenceSummary =>
-      text().nullable()(); // JSON-encoded Tiptap doc
+  TextColumn get statement => text().nullable()();
+  TextColumn get comment => text().nullable()();
+  TextColumn get evidenceSummary => text().nullable()();
   TextColumn get status => text()();
   IntColumn get sortOrder => integer().withDefault(const Constant(0))();
 
@@ -123,8 +122,6 @@ class Artifacts extends Table {
   TextColumn get storagePath => text()();
   TextColumn get mimeType => text()();
   IntColumn get sizeBytes => integer()();
-
-  // Local path once this specific artifact file has been downloaded.
   TextColumn get localFilePath => text().nullable()();
 
   @override
@@ -142,6 +139,7 @@ class References extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+@DataClassName('GuidelineReferenceRow')
 class GuidelineReferences extends Table {
   TextColumn get guidelineId => text().references(Guidelines, #id)();
   TextColumn get referenceId => text().references(References, #id)();
@@ -149,6 +147,18 @@ class GuidelineReferences extends Table {
 
   @override
   Set<Column> get primaryKey => {guidelineId, referenceId};
+}
+
+// NEW (schema v2) — mirrors public.app_settings: flat key/value config,
+// global, not guideline-scoped (feature flags, maintenance banner, etc).
+@DataClassName('AppSettingRow')
+class AppSettings extends Table {
+  TextColumn get key => text()();
+  TextColumn get value => text()(); // JSON-encoded jsonb value
+  DateTimeColumn get updatedAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {key};
 }
 
 @DriftDatabase(
@@ -162,13 +172,29 @@ class GuidelineReferences extends Table {
     Artifacts,
     References,
     GuidelineReferences,
+    AppSettings,
   ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+    onCreate: (m) async {
+      await m.createAll();
+    },
+    onUpgrade: (m, from, to) async {
+      if (from < 2) {
+        // authors column added to the existing Guidelines table
+        await m.addColumn(guidelines, guidelines.authors);
+        // brand new table
+        await m.createTable(appSettings);
+      }
+    },
+  );
 }
 
 LazyDatabase _openConnection() {

@@ -6,7 +6,6 @@ import 'guideline_version.dart';
 part 'guideline.freezed.dart';
 part 'guideline.g.dart';
 
-/// Flat row shape, matching the `guidelines` table exactly.
 @freezed
 class Guideline with _$Guideline {
   const factory Guideline({
@@ -20,21 +19,17 @@ class Guideline with _$Guideline {
     required GuidelineStatus status,
     @JsonKey(name: 'current_version_id') String? currentVersionId,
     @JsonKey(name: 'next_review_date') DateTime? nextReviewDate,
+    @Default([]) List<GuidelineAuthor> authors,
   }) = _Guideline;
 
   factory Guideline.fromJson(Map<String, dynamic> json) =>
       _$GuidelineFromJson(json);
 }
 
-/// Composite shape the reader actually consumes: a Guideline plus
-/// its (single, published) current version and its authors —
-/// assembled by the repository layer in Phase 4 via a join query,
-/// not a 1:1 mirror of any single table.
 @freezed
 class GuidelineDetail with _$GuidelineDetail {
   const factory GuidelineDetail({
     required Guideline guideline,
     required GuidelineVersion currentVersion,
-    @Default([]) List<GuidelineAuthor> authors,
   }) = _GuidelineDetail;
 }

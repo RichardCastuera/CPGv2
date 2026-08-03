@@ -12,7 +12,7 @@ import '../models/reference.dart';
 import '../models/enums.dart';
 
 // ------------------------------------------------------------
-// Guideline
+// Guideline (now carries embedded authors)
 // ------------------------------------------------------------
 
 GuidelinesCompanion guidelineToCompanion(
@@ -32,6 +32,7 @@ GuidelinesCompanion guidelineToCompanion(
     status: g.status.name,
     currentVersionId: Value(g.currentVersionId),
     nextReviewDate: Value(g.nextReviewDate),
+    authors: Value(jsonEncode(g.authors.map((a) => a.toJson()).toList())),
     isDownloaded: Value(isDownloaded ?? false),
     downloadedAt: Value(downloadedAt),
     localSizeBytes: Value(localSizeBytes),
@@ -39,6 +40,7 @@ GuidelinesCompanion guidelineToCompanion(
 }
 
 Guideline guidelineFromRow(GuidelineRow row) {
+  final authorsJson = jsonDecode(row.authors) as List;
   return Guideline(
     id: row.id,
     title: row.title,
@@ -50,32 +52,9 @@ Guideline guidelineFromRow(GuidelineRow row) {
     status: GuidelineStatus.values.byName(row.status),
     currentVersionId: row.currentVersionId,
     nextReviewDate: row.nextReviewDate,
-  );
-}
-
-// ------------------------------------------------------------
-// GuidelineAuthor
-// ------------------------------------------------------------
-
-GuidelineAuthorsCompanion authorToCompanion(GuidelineAuthor a) {
-  return GuidelineAuthorsCompanion.insert(
-    id: a.id,
-    guidelineId: a.guidelineId,
-    name: a.name,
-    position: a.position,
-    affiliation: Value(a.affiliation),
-    sortOrder: Value(a.sortOrder),
-  );
-}
-
-GuidelineAuthor authorFromRow(GuidelineAuthorRow row) {
-  return GuidelineAuthor(
-    id: row.id,
-    guidelineId: row.guidelineId,
-    name: row.name,
-    position: row.position,
-    affiliation: row.affiliation,
-    sortOrder: row.sortOrder,
+    authors: authorsJson
+        .map((a) => GuidelineAuthor.fromJson(a as Map<String, dynamic>))
+        .toList(),
   );
 }
 
@@ -267,3 +246,21 @@ Reference referenceFromRow(ReferenceRow row) {
     doiOrUrl: row.doiOrUrl,
   );
 }
+
+// ------------------------------------------------------------
+// AppSetting — generic key/value, value decoded to dynamic
+// ------------------------------------------------------------
+
+AppSettingsCompanion appSettingToCompanion(
+  String key,
+  dynamic value,
+  DateTime updatedAt,
+) {
+  return AppSettingsCompanion.insert(
+    key: key,
+    value: jsonEncode(value),
+    updatedAt: updatedAt,
+  );
+}
+
+dynamic appSettingValueFromRow(AppSettingRow row) => jsonDecode(row.value);

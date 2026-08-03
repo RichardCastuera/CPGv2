@@ -6,8 +6,8 @@ part 'guideline_author.g.dart';
 @freezed
 class GuidelineAuthor with _$GuidelineAuthor {
   const factory GuidelineAuthor({
-    required String id,
-    @JsonKey(name: 'guideline_id') required String guidelineId,
+    String? id,
+    @JsonKey(name: 'guideline_id') String? guidelineId,
     required String name,
     required String position,
     String? affiliation,

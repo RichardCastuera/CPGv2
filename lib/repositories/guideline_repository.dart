@@ -2,19 +2,15 @@ import 'package:drift/drift.dart';
 import '../core/database/app_database.dart';
 import '../core/supabase/supabase_client.dart';
 import '../models/guideline.dart';
-import '../models/guideline_author.dart';
 import '../models/guideline_version.dart';
 import '../models/section.dart';
 import '../models/question.dart';
 import '../models/recommendation.dart';
 import '../models/artifact.dart';
+import '../models/guideline_library_item.dart';
 import '../models/reference.dart';
 import 'mappers.dart';
 
-/// Local-first: every read method streams from Drift. Sync methods hit
-/// Supabase and write results into Drift — the UI never talks to
-/// Supabase directly. This is what lets every screen work offline by
-/// default, with sync just being "more/fresher rows show up."
 class GuidelineRepository {
   final AppDatabase _db;
   final _supabase = SupabaseService.client;
@@ -22,13 +18,11 @@ class GuidelineRepository {
   GuidelineRepository(this._db);
 
   // ------------------------------------------------------------
-  // LOCAL READS (what the UI actually calls)
+  // LOCAL READS
   // ------------------------------------------------------------
 
-  /// Library screen — all cached guidelines, optionally filtered.
-  Stream<List<Guideline>> watchLibrary({
-    List<String>?
-    statusFilter, // e.g. ['published'] or ['published','archived']
+  Stream<List<GuidelineLibraryItem>> watchLibrary({
+    List<String>? statusFilter,
     bool downloadedOnly = false,
   }) {
     final query = _db.select(_db.guidelines);
@@ -38,7 +32,18 @@ class GuidelineRepository {
     if (downloadedOnly) {
       query.where((g) => g.isDownloaded.equals(true));
     }
-    return query.watch().map((rows) => rows.map(guidelineFromRow).toList());
+    return query.watch().map(
+      (rows) => rows
+          .map(
+            (row) => GuidelineLibraryItem(
+              guideline: guidelineFromRow(row),
+              isDownloaded: row.isDownloaded,
+              downloadedAt: row.downloadedAt,
+              localSizeBytes: row.localSizeBytes,
+            ),
+          )
+          .toList(),
+    );
   }
 
   Stream<Guideline?> watchGuideline(String guidelineId) {
@@ -56,13 +61,6 @@ class GuidelineRepository {
     return query.watchSingleOrNull().map(
       (row) => row == null ? null : versionFromRow(row),
     );
-  }
-
-  Stream<List<GuidelineAuthor>> watchAuthors(String guidelineId) {
-    final query = _db.select(_db.guidelineAuthors)
-      ..where((a) => a.guidelineId.equals(guidelineId))
-      ..orderBy([(a) => OrderingTerm.asc(a.sortOrder)]);
-    return query.watch().map((rows) => rows.map(authorFromRow).toList());
   }
 
   Stream<List<Section>> watchSections(String versionId) {
@@ -111,12 +109,17 @@ class GuidelineRepository {
     );
   }
 
+  Stream<dynamic> watchSetting(String key) {
+    final query = _db.select(_db.appSettings)..where((s) => s.key.equals(key));
+    return query.watchSingleOrNull().map(
+      (row) => row == null ? null : appSettingValueFromRow(row),
+    );
+  }
+
   // ------------------------------------------------------------
-  // REMOTE SYNC (writes into Drift; UI finds out via the streams above)
+  // REMOTE SYNC
   // ------------------------------------------------------------
 
-  /// Fetch the guideline list (metadata only — no tree) and upsert into
-  /// Drift. Call this on app start and on reconnect. Cheap: one query.
   Future<int> syncLibrary() async {
     final response = await _supabase.from('guidelines').select().inFilter(
       'status',
@@ -129,7 +132,6 @@ class GuidelineRepository {
 
     await _db.transaction(() async {
       for (final g in remote) {
-        // Preserve local-only download state on update.
         final existing = await (_db.select(
           _db.guidelines,
         )..where((row) => row.id.equals(g.id))).getSingleOrNull();
@@ -150,32 +152,16 @@ class GuidelineRepository {
     return remote.length;
   }
 
-  /// Fetch the full tree for one guideline (version, sections, questions,
-  /// recommendations, artifacts, references) and upsert into Drift.
-  /// Call this when opening a Guideline Overview screen (to make sure
-  /// it's current) and as part of the download flow (Phase 6).
   Future<void> syncGuidelineDetail(String guidelineId) async {
-    // -- version (only the published one is visible per RLS) --
     final versionRes = await _supabase
         .from('guideline_versions')
         .select()
         .eq('guideline_id', guidelineId)
         .eq('status', 'published')
         .maybeSingle();
-    if (versionRes == null) return; // nothing published for this guideline
+    if (versionRes == null) return;
     final version = GuidelineVersion.fromJson(versionRes);
 
-    // -- authors --
-    final authorsRes = await _supabase
-        .from('guideline_authors')
-        .select()
-        .eq('guideline_id', guidelineId)
-        .order('sort_order');
-    final authors = (authorsRes as List)
-        .map((row) => GuidelineAuthor.fromJson(row))
-        .toList();
-
-    // -- sections --
     final sectionsRes = await _supabase
         .from('sections')
         .select()
@@ -185,7 +171,6 @@ class GuidelineRepository {
         .map((row) => Section.fromJson(row))
         .toList();
 
-    // -- questions (all sections at once, split client-side) --
     final sectionIds = sections.map((s) => s.id).toList();
     final questionsRes = sectionIds.isEmpty
         ? []
@@ -198,7 +183,6 @@ class GuidelineRepository {
         .map((row) => Question.fromJson(row))
         .toList();
 
-    // -- recommendations (all questions at once) --
     final questionIds = questions.map((q) => q.id).toList();
     final recsRes = questionIds.isEmpty
         ? []
@@ -211,7 +195,6 @@ class GuidelineRepository {
         .map((row) => Recommendation.fromJson(row))
         .toList();
 
-    // -- artifacts --
     final artifactsRes = await _supabase
         .from('artifacts')
         .select()
@@ -220,7 +203,6 @@ class GuidelineRepository {
         .map((row) => Artifact.fromJson(row))
         .toList();
 
-    // -- references (via join table) --
     final refJoinRes = await _supabase
         .from('guideline_references')
         .select('sort_order, references(*)')
@@ -230,7 +212,6 @@ class GuidelineRepository {
         .map((row) => Reference.fromJson(row['references']))
         .toList();
 
-    // -- write everything in one transaction --
     await _db.transaction(() async {
       final existingVersion = await (_db.select(
         _db.guidelineVersions,
@@ -245,11 +226,6 @@ class GuidelineRepository {
             ),
           );
 
-      for (final a in authors) {
-        await _db
-            .into(_db.guidelineAuthors)
-            .insertOnConflictUpdate(authorToCompanion(a));
-      }
       for (final s in sections) {
         await _db
             .into(_db.sections)
@@ -292,5 +268,29 @@ class GuidelineRepository {
             );
       }
     });
+  }
+
+  Future<void> syncAppSettings() async {
+    final response = await _supabase.from('app_settings').select();
+    final rows = response as List;
+
+    await _db.transaction(() async {
+      for (final row in rows) {
+        await _db
+            .into(_db.appSettings)
+            .insertOnConflictUpdate(
+              appSettingToCompanion(
+                row['key'] as String,
+                row['value'],
+                DateTime.parse(row['updated_at'] as String),
+              ),
+            );
+      }
+    });
+  }
+
+  Future<Set<String>> currentGuidelineIds() async {
+    final rows = await _db.select(_db.guidelines).get();
+    return rows.map((r) => r.id).toSet();
   }
 }
