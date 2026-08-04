@@ -87,8 +87,11 @@ class _GuidelineDetailPageState extends ConsumerState<GuidelineDetailPage> {
     final artifactProgressNotifier = ref.read(
       artifactDownloadProgressProvider.notifier,
     );
-    final artifactProgressState = ref.read(artifactDownloadProgressProvider);
+    final artifactCanceledNotifier = ref.read(
+      artifactDownloadCanceledProvider.notifier,
+    );
 
+    artifactCanceledNotifier.clearCanceled(artifact.id);
     artifactProgressNotifier.setProgress(
       artifact.id,
       DownloadProgress(
@@ -100,7 +103,11 @@ class _GuidelineDetailPageState extends ConsumerState<GuidelineDetailPage> {
 
     setState(() {
       _isDownloading = true;
-      _downloadProgress = artifactProgressState[artifact.id];
+      _downloadProgress = DownloadProgress(
+        bytesDownloaded: 0,
+        totalBytes: artifact.sizeBytes,
+        currentFileName: artifact.name,
+      );
     });
 
     try {
@@ -141,7 +148,12 @@ class _GuidelineDetailPageState extends ConsumerState<GuidelineDetailPage> {
     final artifactProgressNotifier = ref.read(
       artifactDownloadProgressProvider.notifier,
     );
+    final artifactCanceledNotifier = ref.read(
+      artifactDownloadCanceledProvider.notifier,
+    );
+
     artifactProgressNotifier.clearProgress(artifactId);
+    artifactCanceledNotifier.markCanceled(artifactId);
 
     if (!mounted) return;
     setState(() {
@@ -213,6 +225,7 @@ class _GuidelineDetailPageState extends ConsumerState<GuidelineDetailPage> {
     final artifactsAsync = ref.watch(artifactsStreamProvider(guidelineId));
     final referencesAsync = ref.watch(referencesStreamProvider(guidelineId));
     final artifactProgress = ref.watch(artifactDownloadProgressProvider);
+    final canceledArtifacts = ref.watch(artifactDownloadCanceledProvider);
 
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -275,6 +288,15 @@ class _GuidelineDetailPageState extends ConsumerState<GuidelineDetailPage> {
                         children: [
                           Text(artifact.category.name),
                           Text(artifact.mimeType),
+                          if (canceledArtifacts.contains(artifact.id))
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Text(
+                                'Download cancelled. Tap retry to try again.',
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(color: Colors.red),
+                              ),
+                            ),
                           if (artifactProgress.containsKey(artifact.id))
                             Padding(
                               padding: const EdgeInsets.only(top: 8),
@@ -327,8 +349,14 @@ class _GuidelineDetailPageState extends ConsumerState<GuidelineDetailPage> {
                             )
                           else if (artifact.localFilePath == null)
                             IconButton(
-                              icon: const Icon(Icons.download),
-                              tooltip: 'Download this artifact',
+                              icon: Icon(
+                                canceledArtifacts.contains(artifact.id)
+                                    ? Icons.refresh
+                                    : Icons.download,
+                              ),
+                              tooltip: canceledArtifacts.contains(artifact.id)
+                                  ? 'Retry download'
+                                  : 'Download this artifact',
                               onPressed: _isDownloading
                                   ? null
                                   : () => _downloadArtifact(artifact),

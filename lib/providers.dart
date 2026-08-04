@@ -98,3 +98,22 @@ final artifactDownloadProgressProvider =
       ArtifactDownloadProgressNotifier,
       Map<String, DownloadProgress>
     >((ref) => ArtifactDownloadProgressNotifier());
+
+class ArtifactDownloadCancelNotifier extends StateNotifier<Set<String>> {
+  ArtifactDownloadCancelNotifier() : super({});
+
+  void markCanceled(String artifactId) {
+    state = {...state, artifactId};
+  }
+
+  void clearCanceled(String artifactId) {
+    final next = {...state};
+    next.remove(artifactId);
+    state = next;
+  }
+}
+
+final artifactDownloadCanceledProvider =
+    StateNotifierProvider<ArtifactDownloadCancelNotifier, Set<String>>(
+      (ref) => ArtifactDownloadCancelNotifier(),
+    );
