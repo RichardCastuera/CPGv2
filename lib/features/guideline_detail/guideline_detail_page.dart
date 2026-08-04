@@ -84,13 +84,23 @@ class _GuidelineDetailPageState extends ConsumerState<GuidelineDetailPage> {
   }
 
   Future<void> _downloadArtifact(Artifact artifact) async {
-    setState(() {
-      _isDownloading = true;
-      _downloadProgress = DownloadProgress(
+    final artifactProgressNotifier = ref.read(
+      artifactDownloadProgressProvider.notifier,
+    );
+    final artifactProgressState = ref.read(artifactDownloadProgressProvider);
+
+    artifactProgressNotifier.setProgress(
+      artifact.id,
+      DownloadProgress(
         bytesDownloaded: 0,
         totalBytes: artifact.sizeBytes,
         currentFileName: artifact.name,
-      );
+      ),
+    );
+
+    setState(() {
+      _isDownloading = true;
+      _downloadProgress = artifactProgressState[artifact.id];
     });
 
     try {
@@ -99,6 +109,7 @@ class _GuidelineDetailPageState extends ConsumerState<GuidelineDetailPage> {
         artifact,
         onProgress: (progress) {
           if (!mounted) return;
+          artifactProgressNotifier.setProgress(artifact.id, progress);
           setState(() {
             _downloadProgress = progress;
           });
@@ -115,10 +126,31 @@ class _GuidelineDetailPageState extends ConsumerState<GuidelineDetailPage> {
         context,
       ).showSnackBar(SnackBar(content: Text('Download failed: $error')));
     } finally {
+      artifactProgressNotifier.clearProgress(artifact.id);
       if (mounted) {
-        setState(() => _isDownloading = false);
+        setState(() {
+          _isDownloading = false;
+          _downloadProgress = null;
+        });
       }
     }
+  }
+
+  void _cancelArtifactDownload(String artifactId) {
+    _downloadManager.cancelArtifactDownload(artifactId);
+    final artifactProgressNotifier = ref.read(
+      artifactDownloadProgressProvider.notifier,
+    );
+    artifactProgressNotifier.clearProgress(artifactId);
+
+    if (!mounted) return;
+    setState(() {
+      _isDownloading = false;
+      _downloadProgress = null;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Artifact download cancelled.')),
+    );
   }
 
   @override
@@ -180,6 +212,7 @@ class _GuidelineDetailPageState extends ConsumerState<GuidelineDetailPage> {
     final sectionsAsync = ref.watch(sectionsStreamProvider(versionId));
     final artifactsAsync = ref.watch(artifactsStreamProvider(guidelineId));
     final referencesAsync = ref.watch(referencesStreamProvider(guidelineId));
+    final artifactProgress = ref.watch(artifactDownloadProgressProvider);
 
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -242,6 +275,26 @@ class _GuidelineDetailPageState extends ConsumerState<GuidelineDetailPage> {
                         children: [
                           Text(artifact.category.name),
                           Text(artifact.mimeType),
+                          if (artifactProgress.containsKey(artifact.id))
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  LinearProgressIndicator(
+                                    value:
+                                        artifactProgress[artifact.id]!.fraction,
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '${artifactProgress[artifact.id]!.currentFileName} · ${artifactProgress[artifact.id]!.bytesDownloaded} / ${artifactProgress[artifact.id]!.totalBytes > 0 ? artifactProgress[artifact.id]!.totalBytes : '...'} bytes',
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.bodySmall,
+                                  ),
+                                ],
+                              ),
+                            ),
                         ],
                       ),
                       trailing: Row(
@@ -265,7 +318,14 @@ class _GuidelineDetailPageState extends ConsumerState<GuidelineDetailPage> {
                             )
                           else if (artifact.localFilePath != null)
                             const Icon(Icons.check, color: Colors.green),
-                          if (artifact.localFilePath == null)
+                          if (artifactProgress.containsKey(artifact.id))
+                            IconButton(
+                              icon: const Icon(Icons.cancel),
+                              tooltip: 'Cancel download',
+                              onPressed: () =>
+                                  _cancelArtifactDownload(artifact.id),
+                            )
+                          else if (artifact.localFilePath == null)
                             IconButton(
                               icon: const Icon(Icons.download),
                               tooltip: 'Download this artifact',

@@ -187,6 +187,10 @@ class DownloadManager {
     _activeTokens[guidelineId]?.cancel();
   }
 
+  void cancelArtifactDownload(String artifactId) {
+    _activeTokens[artifactId]?.cancel();
+  }
+
   Future<String> downloadArtifact(
     String guidelineId,
     Artifact artifact, {
@@ -195,23 +199,23 @@ class DownloadManager {
     final token = _CancelToken();
     _activeTokens[artifact.id] = token;
 
-    try {
-      final docsDir = await getApplicationDocumentsDirectory();
-      final guidelineDir = Directory(
-        p.join(docsDir.path, 'downloads', guidelineId),
-      );
-      await guidelineDir.create(recursive: true);
+    final docsDir = await getApplicationDocumentsDirectory();
+    final guidelineDir = Directory(
+      p.join(docsDir.path, 'downloads', guidelineId),
+    );
+    await guidelineDir.create(recursive: true);
 
+    final destFile = File(
+      p.join(
+        guidelineDir.path,
+        '${artifact.id}_${p.basename(artifact.storagePath)}',
+      ),
+    );
+
+    try {
       final signedUrlRes = await _supabase.storage
           .from('artifacts')
           .createSignedUrl(artifact.storagePath, 60);
-
-      final destFile = File(
-        p.join(
-          guidelineDir.path,
-          '${artifact.id}_${p.basename(artifact.storagePath)}',
-        ),
-      );
 
       int cumulativeDownloaded = 0;
       await _streamDownload(
@@ -245,8 +249,8 @@ class DownloadManager {
 
       return destFile.path;
     } on DownloadCancelledException {
-      if (_activeTokens.containsKey(artifact.id)) {
-        await _deleteGuidelineFiles(guidelineId);
+      if (await destFile.exists()) {
+        await destFile.delete();
       }
       rethrow;
     } finally {

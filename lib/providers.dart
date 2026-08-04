@@ -77,3 +77,24 @@ final downloadManagerProvider = Provider<DownloadManager>((ref) {
     ref.read(guidelineRepositoryProvider),
   );
 });
+
+class ArtifactDownloadProgressNotifier
+    extends StateNotifier<Map<String, DownloadProgress>> {
+  ArtifactDownloadProgressNotifier() : super({});
+
+  void setProgress(String artifactId, DownloadProgress progress) {
+    state = {...state, artifactId: progress};
+  }
+
+  void clearProgress(String artifactId) {
+    final next = {...state};
+    next.remove(artifactId);
+    state = next;
+  }
+}
+
+final artifactDownloadProgressProvider =
+    StateNotifierProvider<
+      ArtifactDownloadProgressNotifier,
+      Map<String, DownloadProgress>
+    >((ref) => ArtifactDownloadProgressNotifier());
