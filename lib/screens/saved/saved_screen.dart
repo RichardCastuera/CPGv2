@@ -21,9 +21,10 @@ class _SavedScreenState extends ConsumerState<SavedScreen> {
   @override
   Widget build(BuildContext context) {
     final db = ref.watch(localDbProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: isDark ? AppColors.darkBackground : AppColors.background,
       body: StreamBuilder<List<Bookmark>>(
         stream: db.watchBookmarks(),
         builder: (context, snapshot) {
@@ -89,12 +90,13 @@ class _Header extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(16, 52, 16, 22),
-      decoration: const BoxDecoration(
-        color: AppColors.primaryGreen,
-        borderRadius: BorderRadius.only(
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.primaryGreenLight : AppColors.primaryGreen,
+        borderRadius: const BorderRadius.only(
             bottomLeft: Radius.circular(28), bottomRight: Radius.circular(28)),
       ),
       child: Row(
