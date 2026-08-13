@@ -1,28 +1,53 @@
-import 'package:cpg_reader/core/supabase/supabase_client.dart';
-import 'package:cpg_reader/features/home/home_page.dart';
-import 'package:cpg_reader/theme/app_theme.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import 'theme/app_theme.dart';
+import 'providers/settings_providers.dart';
+import 'screens/shell/app_shell.dart';
+import 'services/auth_service.dart';
+import 'services/supabase_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await dotenv.load(fileName: '.env');
   await SupabaseService.initialize();
+  // Silent anonymous sign-in: gives every device a stable auth.uid() for
+  // bookmarks/sync/RLS with no login screen and no account required.
+  await AuthService.instance.ensureSignedIn();
 
-  runApp(const ProviderScope(child: CpgReaderApp()));
+  // Load persisted Settings > Reading Preferences before the first frame,
+  // so there's no flash of the default theme/text size on launch.
+  final prefs = await SharedPreferences.getInstance();
+  final initialThemeMode = themeModeFromString(prefs.getString('theme_mode'));
+  final initialTextSize = textSizeFromString(prefs.getString('text_size'));
+
+  runApp(
+    ProviderScope(
+      overrides: [
+        themeModeProvider.overrideWith(
+            (ref) => ThemeModeController(prefs, initialThemeMode)),
+        textSizeProvider
+            .overrideWith((ref) => TextSizeController(prefs, initialTextSize)),
+      ],
+      child: const CpgApp(),
+    ),
+  );
 }
 
-class CpgReaderApp extends StatelessWidget {
-  const CpgReaderApp({super.key});
+class CpgApp extends ConsumerWidget {
+  const CpgApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themeMode = ref.watch(themeModeProvider);
+
     return MaterialApp(
-      title: 'CPG Reader',
+      title: 'CPG',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.light,
-      home: const HomePage(),
+      theme: AppTheme.light(),
+      darkTheme: AppTheme.dark(),
+      themeMode: themeMode,
+      home: const AppShell(),
     );
   }
 }

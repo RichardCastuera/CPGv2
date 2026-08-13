@@ -30,18 +30,6 @@ class AppColors {
   static const badgeRecommendationBg = Color(0xFFE6DEF7);
   static const badgeRecommendationFg = Color(0xFF6B46C1);
 
-  // Dark mode palette — used by AppTheme.dark() and by screens that read
-  // colors context-aware. Note: most existing screens still reference the
-  // light constants above directly rather than switching on brightness, so
-  // dark mode currently applies correctly to Settings and default Material
-  // widgets (Card, Scaffold, NavigationBar) but not yet to every hardcoded
-  // green header / white card elsewhere — that's a separate follow-up pass.
-  static const darkBackground = Color(0xFF10201A);
-  static const darkCardBackground = Color(0xFF17281F);
-  static const darkTextPrimary = Color(0xFFEDEDED);
-  static const darkTextSecondary = Color(0xFFA9B3AC);
-  static const darkDivider = Color(0xFF2A3A31);
-
   static const statusUpdateAvailable = Color(0xFFC1521A);
   static const statusAvailableOffline = Color(0xFF1F7A3E);
   static const statusDownload = Color(0xFF215E9E);
@@ -109,72 +97,6 @@ class AppTheme {
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(28),
           borderSide: const BorderSide(color: AppColors.primaryGreen),
-        ),
-      ),
-    );
-  }
-
-  static ThemeData dark() {
-    final base = ThemeData(useMaterial3: true, brightness: Brightness.dark);
-
-    return base.copyWith(
-      scaffoldBackgroundColor: AppColors.darkBackground,
-      colorScheme: base.colorScheme.copyWith(
-        primary: AppColors.primaryGreenLight,
-        surface: AppColors.darkCardBackground,
-      ),
-      textTheme: base.textTheme.apply(
-        bodyColor: AppColors.darkTextPrimary,
-        displayColor: AppColors.darkTextPrimary,
-      ),
-      appBarTheme: const AppBarTheme(
-        backgroundColor: AppColors.darkBackground,
-        foregroundColor: AppColors.darkTextPrimary,
-        elevation: 0,
-        centerTitle: false,
-      ),
-      cardTheme: CardThemeData(
-        color: AppColors.darkCardBackground,
-        elevation: 0,
-        margin: EdgeInsets.zero,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: AppColors.darkDivider),
-        ),
-      ),
-      navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: AppColors.darkCardBackground,
-        indicatorColor: AppColors.primaryGreenLight.withValues(alpha: 0.2),
-        labelTextStyle: WidgetStateProperty.resolveWith((states) {
-          final selected = states.contains(WidgetState.selected);
-          return TextStyle(
-            fontSize: 11,
-            fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-            color: selected ? AppColors.primaryGreenLight : AppColors.darkTextSecondary,
-          );
-        }),
-        iconTheme: WidgetStateProperty.resolveWith((states) {
-          final selected = states.contains(WidgetState.selected);
-          return IconThemeData(
-            color: selected ? AppColors.primaryGreenLight : AppColors.darkTextSecondary,
-          );
-        }),
-      ),
-      inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        fillColor: AppColors.darkCardBackground,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(28),
-          borderSide: const BorderSide(color: AppColors.darkDivider),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(28),
-          borderSide: const BorderSide(color: AppColors.darkDivider),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(28),
-          borderSide: const BorderSide(color: AppColors.primaryGreenLight),
         ),
       ),
     );

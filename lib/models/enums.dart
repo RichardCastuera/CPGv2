@@ -1,9 +1,59 @@
-enum GuidelineType { Compendium, Interim }
+/// Mirrors `guideline_type` USER-DEFINED enum in the CMS schema.
+enum GuidelineType {
+  interim,
+  compendium,
+  omnibus;
 
-enum GuidelineStatus { draft, in_review, published, archived }
+  static GuidelineType fromString(String value) {
+    return GuidelineType.values.firstWhere(
+      (e) => e.name == value.toLowerCase(),
+      orElse: () => GuidelineType.compendium,
+    );
+  }
 
-enum VersionStatus { draft, in_review, published, superseded }
+  String get label => name.toUpperCase();
+}
 
-enum NodeStatus { draft, complete, needs_review }
+/// Mirrors `guideline_status` USER-DEFINED enum on `guidelines.status`.
+enum GuidelineStatus {
+  active,
+  inactive;
 
-enum ArtifactCategory { figure, table, flowchart, chart, pdf }
+  static GuidelineStatus fromString(String value) {
+    return GuidelineStatus.values.firstWhere(
+      (e) => e.name == value.toLowerCase(),
+      orElse: () => GuidelineStatus.active,
+    );
+  }
+
+  String get label => name.toUpperCase();
+}
+
+/// Mirrors `version_status` USER-DEFINED enum on `guideline_versions.status`.
+/// The mobile app only ever reads `published` and `archived` rows (RLS-enforced
+/// server-side too), but we model all four so the type is honest.
+enum VersionStatus {
+  draft,
+  review,
+  published,
+  archived;
+
+  static VersionStatus fromString(String value) {
+    return VersionStatus.values.firstWhere(
+      (e) => e.name == value.toLowerCase(),
+      orElse: () => VersionStatus.published,
+    );
+  }
+
+  String get label => name.toUpperCase();
+
+  bool get isVisibleToMobile => this == published || this == archived;
+}
+
+/// Local, on-device download state — not a DB column, purely client-side.
+enum DownloadState {
+  notDownloaded,
+  downloading,
+  downloaded,
+  updateAvailable,
+}

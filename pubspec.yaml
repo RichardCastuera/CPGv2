@@ -1,99 +1,61 @@
-name: cpg_reader
-description: "A new Flutter project."
-# The following line prevents the package from being accidentally published to
-# pub.dev using `flutter pub publish`. This is preferred for private packages.
-publish_to: "none" # Remove this line if you wish to publish to pub.dev
-
-# The following defines the version and build number for your application.
-# A version number is three numbers separated by dots, like 1.2.43
-# followed by an optional build number separated by a +.
-# Both the version and the builder number may be overridden in flutter
-# build by specifying --build-name and --build-number, respectively.
-# In Android, build-name is used as versionName while build-number used as versionCode.
-# Read more about Android versioning at https://developer.android.com/studio/publish/versioning
-# In iOS, build-name is used as CFBundleShortVersionString while build-number is used as CFBundleVersion.
-# Read more about iOS versioning at
-# https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
-# In Windows, build-name is used as the major, minor, and patch parts
-# of the product and file versions while build-number is used as the build suffix.
-version: 1.0.0+1
+name: cpg_mobile
+description: CPG mobile companion app — browse, download offline, bookmark, and ask clinical practice guidelines.
+publish_to: 'none'
+version: 0.1.0+1
 
 environment:
-  sdk: ^3.10.4
+  sdk: '>=3.4.0 <4.0.0'
 
-# Dependencies specify other packages that your package needs in order to work.
-# To automatically upgrade your package dependencies to the latest versions
-# consider running `flutter pub upgrade --major-versions`. Alternatively,
-# dependencies can be manually updated by changing the version numbers below to
-# the latest version available on pub.dev. To see which dependencies have newer
-# versions available, run `flutter pub outdated`.
 dependencies:
   flutter:
     sdk: flutter
+  cupertino_icons: ^1.0.8
 
   # Backend
   supabase_flutter: ^2.8.0
 
-  # State management
+  # State management / navigation
   flutter_riverpod: ^2.6.1
-  riverpod_annotation: ^2.6.1
+  go_router: ^14.6.2
 
-  # Local offline database
-  drift: ^2.22.1
+  # Local/offline storage
+  drift: ^2.22.0
   sqlite3_flutter_libs: ^0.5.28
   path_provider: ^2.1.5
   path: ^1.9.0
 
-  # Connectivity (for reconnect → sync)
+  # Networking / connectivity
   connectivity_plus: ^6.1.0
-
-  # Env config (keep the Supabase URL/anon key out of source control)
-  flutter_dotenv: ^5.2.1
-
-  # Rich content / models
-  freezed_annotation: ^2.4.4
-  json_annotation: ^4.9.0
-
-  # PDF viewing
-  syncfusion_flutter_pdfviewer: ^27.2.5 # or flutter_pdfview if you prefer a lighter/free alt
-
-  # Icons (matches the mockup's line-icon style)
-  cupertino_icons: ^1.0.8
-
-  url_launcher: ^6.3.1
   http: ^1.2.2
+  url_launcher: ^6.3.1
+
+  # Rich text rendering (Tiptap JSON -> Flutter widgets)
+  flutter_html: ^3.0.0
+
+  # UX niceties
+  cached_network_image: ^3.4.1
+  intl: ^0.19.0
+  shimmer: ^3.0.0
+  flutter_svg: ^2.0.15
+  lottie: ^3.3.1
+  shared_preferences: ^2.3.3
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^6.0.0
-
+  flutter_lints: ^5.0.0
+  drift_dev: ^2.22.0
   build_runner: ^2.4.13
-  drift_dev: ^2.22.1
-  riverpod_generator: ^2.6.3
-  freezed: ^2.5.7
-  json_serializable: ^6.9.0
 
-# For information on the generic Dart part of this file, see the
-# following page: https://dart.dev/tools/pub/pubspec
-
-# The following section is specific to Flutter packages.
 flutter:
-  # The following line ensures that the Material Icons font is
-  # included with your application, so that you can use the icons in
-  # the material Icons class.
   uses-material-design: true
-
   assets:
-    - .env
+    - assets/images/
+    - assets/animations/
 
-  fonts:
-    - family: Poppins
-      fonts:
-        - asset: assets/fonts/Poppins-Regular.ttf
-        - asset: assets/fonts/Poppins-Medium.ttf
-          weight: 500
-        - asset: assets/fonts/Poppins-SemiBold.ttf
-          weight: 600
-        - asset: assets/fonts/Poppins-Bold.ttf
-          weight: 700
+# Notes:
+# - Run `flutter pub upgrade --major-versions` after cloning to pick up any newer
+#   compatible releases; the versions above were current as of Aug 2026.
+# - supabase_flutter v2.x uses `publishableKey:` in Supabase.initialize (see main.dart).
+# - Run `dart run build_runner build --delete-conflicting-outputs` after editing
+#   any file under lib/services/local_db to regenerate Drift's generated code.
